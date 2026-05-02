@@ -1,0 +1,100 @@
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres_db
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - app-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ssl_certs:/etc/nginx/ssl:ro
+      - ./phpapp:/var/www/html
+      - php_socket:/var/run/php
+    depends_on:
+      - phpfpm
+      - pgadmin
+    restart: unless-stopped
+    networks:
+      - app-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  phpfpm:
+    build:
+      context: .
+      dockerfile: dockerfile-phpfpm
+    volumes:
+      - ./phpapp:/var/www/html
+      - ssl_certs:/etc/nginx/ssl
+      - ./phpfpm/php-fpm.d/www.conf:/usr/local/etc/php-fpm.d/www.conf:ro
+      - php_socket:/var/run/php
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    expose:
+      - "9000"
+    networks:
+      - app-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    ports:
+      - "8081:80"
+    env_file:
+      - .env
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - app-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+networks:
+  app-network:
+
+volumes:
+  postgres_data:
+  ssl_certs:
+  php_socket:

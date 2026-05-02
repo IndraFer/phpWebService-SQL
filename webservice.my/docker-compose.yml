@@ -1,0 +1,112 @@
+services:
+  mariadb:
+    image: mariadb:lts
+    container_name: mariadb_db
+    volumes:
+      - ./mariadb_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - app-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ssl_certs:/etc/nginx/ssl:ro
+      - ./phpapp:/var/www/html               # Pastikan root sesuai dengan konfigurasi nginx
+      - php_socket:/var/run/php
+    depends_on:
+      - phpfpm
+      - phpmyadmin
+    restart: unless-stopped
+    networks:
+      - app-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  phpfpm:
+    build:
+      context: .
+      dockerfile: dockerfile-phpfpm
+    volumes:
+      - ./phpapp:/var/www/html
+      - ssl_certs:/etc/nginx/ssl
+      - ./phpfpm/php-fpm.d/www.conf:/usr/local/etc/php-fpm.d/www.conf:ro   # Mount konfigurasi PHP-FPM pool custom
+      - php_socket:/var/run/php
+    depends_on:
+      - mariadb
+    restart: unless-stopped
+    expose:
+      - "9000"
+    networks:
+      - app-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost/status"]   # ["CMD", "nc", "-z", "localhost", "9000"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 10s
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: phpmyadmin
+    ports:
+      - "8081:80"
+    env_file:
+      - .env
+    depends_on:
+      - mariadb
+    restart: unless-stopped
+    networks:
+      - app-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  app-network:
+
+volumes:
+  mariadb_data:
+  ssl_certs:
+  php_socket:
