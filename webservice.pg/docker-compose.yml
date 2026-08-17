@@ -23,16 +23,44 @@ services:
       retries: 3
       start_period: 10s
 
+  redis:
+    image: redis:latest
+    container_name: redis_db
+    command: redis-server --appendonly yes
+    # To enable Redis authentication, add REDIS_PASSWORD to .env, then uncomment the line below:
+    # command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./redis_data:/data
+    restart: unless-stopped
+    networks:
+      - app-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      # If authentication is enabled, use: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
   nginx:
     image: nginx:latest
+    container_name: nginx
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d
       - ssl_certs:/etc/nginx/ssl:ro
-      - ./phpapp:/var/www/html
-      - php_socket:/var/run/php
+      - ./phpapp:/var/www/html               # Make sure the root matches the nginx configuration
+      # - php_socket:/var/run/php            # SOCKET MODE only: uncomment for unix socket.
+                                             #   Not needed in PORT MODE (default: fastcgi_pass phpfpm:9000)
     depends_on:
       - phpfpm
       - pgadmin
@@ -55,16 +83,19 @@ services:
     build:
       context: .
       dockerfile: dockerfile-phpfpm
+    container_name: phpfpm
+    env_file:
+      - .env
     volumes:
       - ./phpapp:/var/www/html
       - ssl_certs:/etc/nginx/ssl
       - ./phpfpm/php-fpm.d/www.conf:/usr/local/etc/php-fpm.d/www.conf:ro
-      - php_socket:/var/run/php
+      # - php_socket:/var/run/php            # SOCKET MODE only: uncomment for unix socket (same as nginx)
     depends_on:
       - postgres
     restart: unless-stopped
     expose:
-      - "9000"
+      - "9000"                             # PORT MODE (default): reachable as phpfpm:9000; not needed in socket mode
     networks:
       - app-network
     logging:
@@ -97,4 +128,4 @@ networks:
 volumes:
   postgres_data:
   ssl_certs:
-  php_socket:
+  php_socket:                               # used only in SOCKET MODE (see nginx/phpfpm mounts)

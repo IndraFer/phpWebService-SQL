@@ -18,18 +18,20 @@
 
         .container {
             background-color: #fff;
-            padding: 20px;
+            padding: 24px 32px;
             border-radius: 8px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
             text-align: center;
+            max-width: 480px;
         }
 
         h1 {
             color: #333;
+            margin-top: 0;
         }
 
         .status-message {
-            margin-top: 20px;
+            margin: 16px 0;
             padding: 10px;
             border-radius: 5px;
         }
@@ -45,28 +47,51 @@
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
+
+        .details {
+            color: #888;
+            font-size: 0.85em;
+            margin: 8px 0 16px;
+        }
+
+        .actions a {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+
+        .actions a:hover {
+            background-color: #0056b3;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>MariaDB Connection Test</h1>
+        <h1>MariaDB Connection Status</h1>
         <?php
-        $servername = "mariadb";  // Gunakan nama service Docker MariaDB
-        $username = "root";
-        $password = "root_password";
-        $database = "mysql";
+        // Read credentials from the container environment (see env_file in docker-compose.yml),
+        // with sensible fallbacks so the page still works without them.
+        $host = getenv('MYSQL_HOST') ?: 'mariadb';
+        $user = getenv('MYSQL_USER') ?: 'root';
+        $pass = getenv('MYSQL_ROOT_PASSWORD') ?: 'root_password';
+        $db   = getenv('MYSQL_DATABASE') ?: 'mysql';
 
-        // Membuat koneksi
-        $conn = new mysqli($servername, $username, $password, $database);
-
-        // Cek koneksi
-        if ($conn->connect_error) {
-            echo '<div class="status-message error">Connection failed: ' . $conn->connect_error . '</div>';
-        } else {
+        try {
+            $conn = new PDO("mysql:host=$host;dbname=$db;charset=utf8mb4", $user, $pass);
+            $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
             echo '<div class="status-message success">Connected successfully to MariaDB database!</div>';
-            $conn->close();
+            $conn = null;
+        } catch (PDOException $e) {
+            echo '<div class="status-message error">Connection failed: ' . htmlspecialchars($e->getMessage()) . '</div>';
         }
         ?>
+        <p class="details">Host: <?= htmlspecialchars($host) ?> &middot; Database: <?= htmlspecialchars($db) ?></p>
+        <div class="actions">
+            <a href="phpinfo.php" target="_blank" rel="noopener">Open PHP Info</a>
+        </div>
     </div>
 </body>
 </html>

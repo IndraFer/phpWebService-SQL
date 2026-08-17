@@ -15,12 +15,13 @@ This setup is fully compatible with:
 
 The project is divided into two separate stacks so you can choose the database that fits your needs:
 
-- `webservice.my/` - Stack with **MariaDB** (MySQL compatible) and **phpMyAdmin**
-- `webservice.pg/` - Stack with **PostgreSQL** and **pgAdmin**
+- `webservice.my/` - Stack with **MariaDB** (MySQL compatible), **Redis**, and **phpMyAdmin**
+- `webservice.pg/` - Stack with **PostgreSQL**, **Redis**, and **pgAdmin**
 
 Both stacks include:
 - **Nginx** (Web Server)
 - **PHP-FPM** (Application Processor, pre-configured with required database extensions)
+- **Redis** (in-memory cache / session / queue store, useful for apps in any language)
 - Database data bound to the host (persists data safely across restarts)
 
 ## 🛠️ Getting Started
@@ -41,11 +42,11 @@ cd webservice.pg
 ```
 
 ### 2. Configure Environment Variables
-Both stacks use a `.env` file to manage database credentials securely. We provide a `.env.sample` file in each folder.
+Both stacks use a `.env` file to manage database credentials securely. We provide a `.env.example` file in each folder.
 
-Copy the sample file to `.env`:
+Copy the example file to `.env`:
 ```bash
-cp .env.sample .env
+cp .env.example .env
 ```
 *Note: You can edit the newly created `.env` file to change the default usernames, passwords, and database names.*
 
@@ -73,6 +74,7 @@ Once the containers are up and running, you can access your services via your we
 - `PMA_HOST`: Hostname for phpMyAdmin to connect to (default is `mariadb`).
 - `PMA_USER`: Username for phpMyAdmin login.
 - `PMA_PASSWORD`: Password for phpMyAdmin login.
+- `REDIS_PASSWORD`: Password for Redis (`--requirepass`). Enable it by uncommenting the `command` line provided in `docker-compose.yml`.
 
 ### For `webservice.pg` (PostgreSQL + pgAdmin)
 - `POSTGRES_USER`: The root/default user for PostgreSQL.
@@ -80,9 +82,19 @@ Once the containers are up and running, you can access your services via your we
 - `POSTGRES_DB`: The default database created upon initialization.
 - `PGADMIN_DEFAULT_EMAIL`: The email address used to log in to pgAdmin web interface.
 - `PGADMIN_DEFAULT_PASSWORD`: The password used to log in to pgAdmin.
+- `REDIS_PASSWORD`: Password for Redis (`--requirepass`). Enable it by uncommenting the `command` line provided in `docker-compose.yml`.
 
 ## 💾 Data Persistence
-Database volumes are mounted directly to your host machine (`./mariadb_data` for MySQL and `./postgres_data` for PostgreSQL). This ensures that your database data will not be lost if the containers are removed or rebuilt. It also makes it easy to access the data files from Windows, macOS, or Linux.
+Database volumes are mounted directly to your host machine (`./mariadb_data` for MySQL, `./postgres_data` for PostgreSQL, and `./redis_data` for Redis). This ensures that your database data will not be lost if the containers are removed or rebuilt. It also makes it easy to access the data files from Windows, macOS, or Linux.
+
+## ⚡ Using Redis
+
+Redis is exposed on `localhost:6379` and is ready to be consumed by applications in any language (Python, Go, Node.js, PHP, etc.) as an in-memory cache, session store, or queue broker.
+
+- **Host apps** connect to `127.0.0.1:6379` (no password by default).
+- **Containers inside the stack** connect to the service name `redis` on the `app-network`.
+- **Auth (optional):** add `REDIS_PASSWORD` to your `.env`, then uncomment the `command` line with `--requirepass` in `docker-compose.yml` (and the matching healthcheck line).
+- Persistence is enabled via AOF (`--appendonly yes`), so cache data survives container restarts.
 
 ## 🐘 PHP Configuration
 By default, the PHP configurations are set within the Dockerfile (e.g., OPcache). If you need to add custom configurations via a `php.ini` file:

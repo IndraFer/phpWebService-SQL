@@ -7,7 +7,7 @@ CERT_CRT="$CERT_DIR/localhost.crt"
 
 mkdir -p "$CERT_DIR"
 
-# Generate hanya jika file tidak ada dan folder mount bukan kosong
+# Generate only if files do not exist and the mount folder is not empty
 if [ ! -f "$CERT_KEY" ] || [ ! -f "$CERT_CRT" ]; then
   if [ "$(ls -A $CERT_DIR)" ]; then
     echo "Certificate directory not empty, skipping generation."

@@ -1,6 +1,6 @@
 FROM php:fpm
 
-# Install dependencies sistem
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     libicu-dev libzip-dev libpng-dev libjpeg-dev libjpeg62-turbo-dev \
     libfreetype6-dev libonig-dev libxml2-dev pkg-config libpq-dev \
@@ -17,7 +17,11 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
 RUN docker-php-ext-install -j$(nproc) \
     gd intl mbstring zip pdo pdo_pgsql pgsql xml bcmath exif
 
-# Optional: install terpisah jika perlu
+# 3. Redis extension (optional; used if the PHP app uses Redis for cache/session/queue)
+RUN pecl install redis \
+    && docker-php-ext-enable redis
+
+# Optional: install separately if needed
 # RUN docker-php-ext-install opcache || true
 
 # Enable opcache via config file (workaround PHP 8.5 bug)
@@ -26,39 +30,39 @@ RUN echo "opcache.enable=1" > /usr/local/etc/php/conf.d/opcache.ini \
     && echo "opcache.interned_strings_buffer=8" >> /usr/local/etc/php/conf.d/opcache.ini \
     && echo "opcache.max_accelerated_files=4000" >> /usr/local/etc/php/conf.d/opcache.ini
 
-# Install Composer (direkomendasikan untuk dependency management)
+# Install Composer (recommended for dependency management)
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# Buat folder untuk menyimpan sertifikat SSL (jika diperlukan)
+# Create folder to store SSL certificates (if needed)
 RUN mkdir -p /etc/nginx/ssl
 
-# Generate self-signed SSL certificate otomatis saat build (opsional)
+# Generate self-signed SSL certificate automatically during build (optional)
 RUN openssl req -x509 -nodes -days 365 \
     -subj "/C=ID/ST=Jakarta/L=Jakarta/O=KoiN-CoDeveloper/CN=localhost" \
     -newkey rsa:2048 \
     -keyout /etc/nginx/ssl/localhost.key \
     -out /etc/nginx/ssl/localhost.crt
 
-# Copy konfigurasi php.ini khusus (opsional, bisa juga mount volume di docker-compose)
+# Copy custom php.ini config (optional; can also be mounted as a volume in docker-compose)
 # COPY ./php.ini /usr/local/etc/php/
 
-# Copy konfigurasi PHP-FPM pool jika ingin custom (opsional, bisa juga mount volume di docker-compose)
+# Copy custom PHP-FPM pool config if needed (optional; can also be mounted as a volume in docker-compose)
 # COPY ./www.conf /usr/local/etc/php-fpm.d/www.conf
 
-# Copy source code aplikasi (opsional, bisa juga mount volume di docker-compose)
+# Copy application source code (optional; can also be mounted as a volume in docker-compose)
 # COPY ./phpapp /var/www/html
 
-# Tambah untuk production (Optional)
+# Add for production (optional)
 ENV PHP_OPCACHE_ENABLE=1
 ENV PHP_MEMORY_LIMIT=256M
 
 # Set working directory
 WORKDIR /var/www/html
 
-# Set permission jika perlu
+# Set permissions if needed
 # RUN chown -R www-data:www-data /var/www/html
 
-# Set permission log (Optional)
+# Set log permissions (optional)
 RUN mkdir -p /var/log/php-fpm && chown -R www-data:www-data /var/log/php-fpm
 
 # Fix PHP-FPM socket error
@@ -66,5 +70,5 @@ RUN mkdir -p /var/run/php && \
     chown -R www-data:www-data /var/run/php && \
     chmod 777 /var/run/php
 
-# Expose port FPM default
+# Expose default FPM port
 EXPOSE 9000
